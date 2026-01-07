@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class VoiceService {
   final String apiKey; // Would come from secure storage or constants
 
-  VoiceService({this.apiKey = 'YOUR_GOOGLE_CLOUD_API_KEY'});
+  VoiceService({String? apiKey})
+      : apiKey = apiKey ?? dotenv.env['GOOGLE_TRANSLATE_API_KEY'] ?? '';
 
   /// Sends text to Google Translate API.
   /// This is the "Backend hook" preparation.

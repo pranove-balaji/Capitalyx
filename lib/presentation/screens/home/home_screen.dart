@@ -8,6 +8,10 @@ import 'package:startup_application/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:startup_application/presentation/widgets/glow_background.dart';
 import 'package:startup_application/presentation/widgets/language_selector.dart';
+import 'package:startup_application/presentation/widgets/translated_text.dart';
+import 'package:startup_application/injection_container.dart' as di;
+import 'package:startup_application/domain/repositories/query_repository.dart';
+import 'package:startup_application/presentation/providers/language_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -58,8 +62,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       key: _scaffoldKey,
-      // backgroundColor: Use theme background (now #121212 in dark mode)
-      extendBodyBehindAppBar: true, // Allow glow to go behind AppBar
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -67,6 +70,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         leading: IconButton(
           icon: Icon(Icons.menu, color: theme.colorScheme.onSurface),
           onPressed: () {
+            // Keeping the original drawer on left if needed or just replace?
+            // User requested "Clicking the top-right 'Three Dots' must open a sidebar"
+            // So we use endDrawer for the sidebar the user requested.
             _scaffoldKey.currentState?.openDrawer();
           },
         ),
@@ -75,18 +81,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           style: TextStyle(
               color: theme.colorScheme.onSurface, fontWeight: FontWeight.w600),
         ),
-        actions: const [
-          LanguageSelector(),
-          SizedBox(width: 8),
+        actions: [
+          // Three dots button for the Sidebar requested
+          IconButton(
+            icon: Icon(Icons.more_vert_rounded,
+                color: theme.colorScheme.onSurface),
+            onPressed: () {
+              _scaffoldKey.currentState?.openEndDrawer();
+            },
+          ),
+          const SizedBox(width: 8),
         ],
       ),
-      onDrawerChanged: (isOpened) {
+      onEndDrawerChanged: (isOpened) {
+        // Detect endDrawer state
         setState(() {
           _isDrawerOpen = isOpened;
         });
       },
-      drawerScrimColor: Colors.transparent,
-      drawer: _buildSidebar(context, ref, secondaryColor),
+      drawerScrimColor: Colors.transparent, // Disable default scrim to use ours
+      drawer: _buildSidebar(context, ref,
+          secondaryColor), // Keep existing left drawer if desired or remove? I'll keep it as "Menu"
+      endDrawer: _buildRightSidebar(
+          context, ref, secondaryColor), // New requested sidebar
       body: GlowBackground(
         secondColor: secondaryColor,
         isDark: isDark,
@@ -94,7 +111,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           children: [
             Column(
               children: [
-                // Spacer for AppBar since we extended body
                 SizedBox(
                     height:
                         kToolbarHeight + MediaQuery.of(context).padding.top),
@@ -107,7 +123,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Logo Placeholder
                         Container(
                           width: 80,
                           height: 80,
@@ -133,7 +148,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               color: Colors.white, size: 40),
                         ),
                         const SizedBox(height: 24),
-                        Text(
+                        TranslatedText(
                           "Hello, ${authState.user?.userMetadata?['full_name'] ?? profile?.startupName ?? 'User'}",
                           style: GoogleFonts.outfit(
                             fontSize: 32,
@@ -143,7 +158,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Text(
+                        TranslatedText(
                           "How can I assist you right now?",
                           style: GoogleFonts.inter(
                             fontSize: 16,
@@ -157,7 +172,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                 ),
 
-                // Feature Widgets (Single Row)
+                // Feature Widgets (Single Row) - Hide when input focused
                 AnimatedOpacity(
                   duration: const Duration(milliseconds: 300),
                   opacity: _isInputMode ? 0.0 : 1.0,
@@ -228,6 +243,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 focusNode: _inputFocusNode,
                                 style: TextStyle(
                                     color: theme.colorScheme.onSurface),
+                                onSubmitted: (value) async {
+                                  if (value.trim().isNotEmpty) {
+                                    final currentLang =
+                                        ref.read(languageProvider);
+                                    await di
+                                        .sl<QueryRepository>()
+                                        .saveProcessedQuery(
+                                            value.trim(), currentLang);
+                                    _textController.clear();
+                                    _inputFocusNode.unfocus();
+                                  }
+                                },
                                 decoration: InputDecoration(
                                   hintText: 'Ask anything here...',
                                   hintStyle: TextStyle(
@@ -249,12 +276,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 shape: BoxShape.circle,
                               ),
                               child: IconButton(
-                                icon: const Icon(Icons.mic_none,
+                                icon: const Icon(Icons.arrow_upward,
                                     color: Colors.white),
-                                onPressed: () {
-                                  setState(() {
-                                    _isInputMode = true;
-                                  });
+                                onPressed: () async {
+                                  final value = _textController.text;
+                                  if (value.trim().isNotEmpty) {
+                                    final currentLang =
+                                        ref.read(languageProvider);
+                                    await di
+                                        .sl<QueryRepository>()
+                                        .saveProcessedQuery(
+                                            value.trim(), currentLang);
+                                    _textController.clear();
+                                    _inputFocusNode.unfocus();
+                                  }
                                 },
                               ),
                             ),
@@ -267,7 +302,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ],
             ),
 
-            // Blur Overlay (Sidebar)
+            // Blur Overlay (Backdrop for both Drawers)
             if (_isDrawerOpen)
               Positioned.fill(
                 child: BackdropFilter(
@@ -283,9 +318,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildSidebar(
+  // Right Sidebar (End Drawer)
+  Widget _buildRightSidebar(
       BuildContext context, WidgetRef ref, Color secondaryColor) {
-    // Re-access theme here correctly
     final themeState = ref.watch(themeProvider);
     final theme = Theme.of(context);
     final isDark = themeState.isDark;
@@ -293,7 +328,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Drawer(
       backgroundColor: isDark
           ? const Color(0xFF1E1E1E).withValues(alpha: 0.9)
-          : Colors.white.withValues(alpha: 0.9), // Slightly transparent
+          : Colors.white.withValues(alpha: 0.9),
       child: SafeArea(
         child: Column(
           children: [
@@ -303,8 +338,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 children: [
                   Icon(Icons.settings, color: theme.colorScheme.onSurface),
                   const SizedBox(width: 12),
-                  Text(
-                    'Settings',
+                  TranslatedText(
+                    'Options',
                     style: GoogleFonts.inter(
                       color: theme.colorScheme.onSurface,
                       fontSize: 20,
@@ -315,8 +350,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
             const Divider(color: Colors.grey),
+            // Switch Theme
             SwitchListTile(
-              title: Text('Dark Mode',
+              title: TranslatedText('Dark Mode',
                   style: TextStyle(color: theme.colorScheme.onSurface)),
               value: isDark,
               activeColor: secondaryColor,
@@ -328,22 +364,78 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 color: theme.colorScheme.onSurface,
               ),
             ),
+            // Language Settings (Using the selector logic or just link)
             ListTile(
-              leading: Icon(Icons.history, color: theme.colorScheme.onSurface),
-              title: Text('History',
+              leading: Icon(Icons.language, color: theme.colorScheme.onSurface),
+              title: TranslatedText('Language Settings',
                   style: TextStyle(color: theme.colorScheme.onSurface)),
-              onTap: () {},
+              trailing: const LanguageSelector(
+                  color: Colors.grey), // Embed selector directly or open dialog
+              onTap: () {
+                // The LanguageSelector widget handles the click itself mostly, but if we want a full page:
+                // context.push('/settings/language');
+                // For now, putting the selector as trailing
+              },
             ),
+            // Logout
             const Spacer(),
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.redAccent),
-              title: const Text('Logout',
+              title: const TranslatedText('Logout',
                   style: TextStyle(color: Colors.redAccent)),
               onTap: () {
+                // Close drawer before sign out to avoid errors
+                Navigator.pop(context);
                 ref.read(authProvider.notifier).signOut();
               },
             ),
             const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Keeping original left sidebar but updating it slightly if necessary or just leaving as 'Menu'
+  // Since the user asked for sidebar on "Three Dots" (Right), I moved the requested items there.
+  // This one can be "Navigation"
+  Widget _buildSidebar(
+      BuildContext context, WidgetRef ref, Color secondaryColor) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Drawer(
+      backgroundColor: isDark
+          ? const Color(0xFF1E1E1E).withValues(alpha: 0.9)
+          : Colors.white.withValues(alpha: 0.9),
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Row(
+                children: [
+                  Icon(Icons.menu, color: theme.colorScheme.onSurface),
+                  const SizedBox(width: 12),
+                  TranslatedText(
+                    'Menu',
+                    style: GoogleFonts.inter(
+                      color: theme.colorScheme.onSurface,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(color: Colors.grey),
+            ListTile(
+              leading: Icon(Icons.history, color: theme.colorScheme.onSurface),
+              title: TranslatedText('History',
+                  style: TextStyle(color: theme.colorScheme.onSurface)),
+              onTap: () {},
+            ),
+            // ... other items
           ],
         ),
       ),
@@ -406,7 +498,7 @@ class _FeatureCard extends StatelessWidget {
                         child: Icon(icon,
                             color: isDark ? Colors.white : Colors.black87,
                             size: 24)),
-                    Text(
+                    TranslatedText(
                       title,
                       style: GoogleFonts.inter(
                           color: isDark ? Colors.white : Colors.black87,

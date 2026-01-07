@@ -8,8 +8,9 @@ import 'package:startup_application/presentation/providers/theme_provider.dart';
 import 'package:startup_application/presentation/router/app_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await dotenv.load(fileName: "assets/.env");
 
   await Supabase.initialize(

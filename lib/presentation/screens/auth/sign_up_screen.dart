@@ -8,6 +8,8 @@ import 'package:startup_application/presentation/widgets/custom_button.dart';
 import 'package:startup_application/presentation/widgets/custom_text_field.dart';
 import 'package:startup_application/presentation/widgets/language_selector.dart';
 
+import 'package:startup_application/presentation/widgets/translated_text.dart';
+
 class SignUpScreen extends ConsumerStatefulWidget {
   const SignUpScreen({super.key});
 
@@ -61,7 +63,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
+              TranslatedText(
                 'Create Account',
                 style: theme.textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
@@ -94,7 +96,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16.0),
                   child: Text(
-                    authState.errorMessage!,
+                    authState.errorMessage!, // Dynamic error message
                     style: TextStyle(color: theme.colorScheme.error),
                     textAlign: TextAlign.center,
                   ),
@@ -107,7 +109,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 textColor: buttonTextColor,
               ),
               const SizedBox(height: 16),
-              Text(
+              TranslatedText(
                 'Check your email after signing up to confirm your account.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall,

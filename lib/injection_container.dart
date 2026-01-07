@@ -6,6 +6,9 @@ import 'package:startup_application/data/repositories/auth_repository_impl.dart'
 import 'package:startup_application/data/repositories/profile_repository_impl.dart';
 import 'package:startup_application/domain/repositories/auth_repository.dart';
 import 'package:startup_application/domain/repositories/profile_repository.dart';
+import 'package:startup_application/domain/repositories/query_repository.dart';
+import 'package:startup_application/data/repositories/query_repository_impl.dart';
+import 'package:startup_application/core/services/glossary_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 final sl = GetIt.instance;
@@ -16,6 +19,9 @@ Future<void> init() async {
   // Or we can just register the client if it's already initialized.
   // Ideally, main calls Supabase.initialize(), then init().
   sl.registerLazySingleton(() => Supabase.instance.client);
+
+  // ! Services
+  sl.registerLazySingleton(() => GlossaryService());
 
   // ! Data Sources
   sl.registerLazySingleton<AuthRemoteDataSource>(
@@ -31,5 +37,8 @@ Future<void> init() async {
   );
   sl.registerLazySingleton<ProfileRepository>(
     () => ProfileRepositoryImpl(sl()),
+  );
+  sl.registerLazySingleton<QueryRepository>(
+    () => QueryRepositoryImpl(sl(), sl()),
   );
 }

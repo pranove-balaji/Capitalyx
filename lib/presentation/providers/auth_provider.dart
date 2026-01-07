@@ -6,7 +6,14 @@ import 'package:startup_application/injection_container.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:startup_application/presentation/providers/theme_provider.dart';
 
-enum AuthStatus { initial, authenticated, unauthenticated, loading, error }
+enum AuthStatus {
+  initial,
+  authenticated,
+  unauthenticated,
+  loading,
+  error,
+  passwordRecovery
+}
 
 class AuthState {
   final AuthStatus status;
@@ -56,6 +63,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       } else if (event.event == AuthChangeEvent.signedOut) {
         state = AuthState(status: AuthStatus.unauthenticated);
         _ref.read(themeProvider.notifier).resetColor();
+      } else if (event.event == AuthChangeEvent.passwordRecovery) {
+        state = state.copyWith(status: AuthStatus.passwordRecovery);
       }
     });
 

@@ -27,6 +27,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           state.uri.toString() == '/forgot-password';
       final isResettingPassword = state.uri.toString() == '/reset-password';
 
+      // Redirect to reset password page if in recovery mode
+      if (authState.status == AuthStatus.passwordRecovery &&
+          !isResettingPassword) {
+        return '/reset-password';
+      }
+
       // Allow access to password reset
       if (isResettingPassword) return null;
 
