@@ -46,7 +46,32 @@ class AppStrings {
     'Angel', 'VC', 'Accelerator', 'Bank', 'Grant',
     'Start Analysis',
     'Please select a file first',
-    'Pitch deck uploaded for analysis!'
+    'Pitch deck uploaded for analysis!',
+
+    // Auth & General
+    'Welcome Back',
+    'Email or Phone Number',
+    'Password',
+    'Forgot Password?',
+    'Sign In',
+    'Don\'t have an account? ',
+    'Sign Up',
+    'Hello',
+    'How can I assist you right now?',
+    'Options',
+    'Dark Mode',
+    'Language Settings',
+    'Logout',
+    'Menu',
+    'History',
+    'AI Query History',
+    'Matches saved to history!',
+    'User not logged in',
+    'Processing voice command...',
+    'Sorry, I couldn\'t hear that. Please try again.',
+    'Please wait, your query is being processed.',
+    'No history yet',
+    'Matching History'
   ];
 
   // Specific markers

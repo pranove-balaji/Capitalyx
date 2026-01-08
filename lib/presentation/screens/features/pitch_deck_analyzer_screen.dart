@@ -8,6 +8,8 @@ import 'package:startup_application/presentation/providers/auth_provider.dart';
 import 'package:startup_application/presentation/widgets/language_selector.dart';
 import 'package:startup_application/presentation/widgets/translated_text.dart';
 import 'package:startup_application/presentation/providers/language_provider.dart';
+import 'package:startup_application/presentation/widgets/pitch_deck_analysis_view.dart';
+// import 'package:startup_application/core/services/glossary_service.dart';
 
 class PitchDeckAnalyzerScreen extends ConsumerStatefulWidget {
   const PitchDeckAnalyzerScreen({super.key});
@@ -22,6 +24,7 @@ class _PitchDeckAnalyzerScreenState
   bool _isLoading = false;
   File? _selectedFile;
   String? _fileName;
+  String? _analysisResult;
 
   String _targetStage = 'Seed';
   String _investorType = 'VC';
@@ -38,7 +41,7 @@ class _PitchDeckAnalyzerScreenState
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf', 'ppt', 'pptx'],
+      allowedExtensions: ['pdf'],
     );
 
     if (result != null && result.files.single.path != null) {
@@ -62,13 +65,19 @@ class _PitchDeckAnalyzerScreenState
     try {
       final extension = _fileName!.split('.').last;
 
-      // Controller uses named parameters
-      await ref.read(featureControllerProvider).uploadPitchDeck(
+      // Controller uses named parameters and returns Future<String?>
+      final result = await ref.read(featureControllerProvider).uploadPitchDeck(
             file: _selectedFile!,
             fileExtension: extension,
             targetStage: _targetStage,
             investorType: _investorType,
           );
+
+      if (mounted) {
+        setState(() {
+          _analysisResult = result;
+        });
+      }
 
       if (mounted) {
         // Success Feedback
@@ -118,7 +127,7 @@ class _PitchDeckAnalyzerScreenState
           ]),
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: secondaryColor))
-          : Padding(
+          : SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -161,7 +170,7 @@ class _PitchDeckAnalyzerScreenState
                                   ),
                                 )
                               : TranslatedText(
-                                  'Tap to upload PDF or PPT',
+                                  'Tap to upload PDF',
                                   style: TextStyle(
                                     color: Colors.white.withValues(alpha: 0.8),
                                     fontSize: 16,
@@ -200,7 +209,7 @@ class _PitchDeckAnalyzerScreenState
                     onChanged: (v) => setState(() => _investorType = v!),
                   ),
 
-                  const Spacer(),
+                  const SizedBox(height: 32),
 
                   SizedBox(
                     height: 56,
@@ -217,6 +226,13 @@ class _PitchDeckAnalyzerScreenState
                               fontSize: 18, fontWeight: FontWeight.bold)),
                     ),
                   ),
+
+                  if (_analysisResult != null) ...[
+                    const SizedBox(height: 32),
+                    // Custom AI Analysis View
+                    PitchDeckAnalysisView(analysisResult: _analysisResult!),
+                  ],
+                  const SizedBox(height: 48), // Bottom padding
                 ],
               ),
             ),

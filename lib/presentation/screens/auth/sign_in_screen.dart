@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:startup_application/presentation/providers/auth_provider.dart';
+import 'package:startup_application/presentation/providers/language_provider.dart';
 import 'package:startup_application/presentation/widgets/custom_button.dart';
 import 'package:startup_application/presentation/widgets/custom_text_field.dart';
 import 'package:startup_application/presentation/widgets/language_selector.dart';
@@ -129,16 +130,16 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 text: TextSpan(
                   style: Theme.of(context).textTheme.bodyMedium,
                   children: [
-                    const TextSpan(
-                      text:
-                          "Don't have an account? ", // This is hard to translate with RichText and TranslatedText widget since it returns a Widget.
-                      // For RichText, better to have a separate mechanism or just use TranslatedText for the whole block if possible, but it has a link.
-                      // I will leave RichText as is for now or use a localized logic later if strictly required.
-                      // Requirement says "TranslatedText Widget: Replace all hardcoded Text widgets".
-                      // I will replace the main headers and simple texts.
+                    TextSpan(
+                      text: ref
+                              .watch(languageProvider)
+                              .translations["Don't have an account? "] ??
+                          "Don't have an account? ",
                     ),
                     TextSpan(
-                      text: "Sign Up",
+                      text:
+                          ref.watch(languageProvider).translations["Sign Up"] ??
+                              "Sign Up",
                       style: const TextStyle(
                         color: Colors.blue,
                         fontWeight: FontWeight.w600,

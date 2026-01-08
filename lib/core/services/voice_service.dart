@@ -11,7 +11,10 @@ class VoiceService {
   final AudioRecorder _audioRecorder = AudioRecorder();
   final AudioPlayer _audioPlayer = AudioPlayer();
 
-  String get _apiKey => dotenv.env['GOOGLE_CLOUD_API_KEY'] ?? "";
+  String get _apiKey =>
+      dotenv.env['GOOGLE_CLOUD_API_KEY'] ??
+      dotenv.env['google_cloud_api_key'] ??
+      "";
 
   bool _isRequestingPermission = false;
 

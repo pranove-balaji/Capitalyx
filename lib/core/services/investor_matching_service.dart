@@ -178,4 +178,20 @@ Do not include any markdown formatting or extra text. Just the JSON array.
       throw Exception('Failed to save matches: $e');
     }
   }
+
+  // 5. Fetch Investor Matches History
+  Future<List<Map<String, dynamic>>> fetchInvestorMatches(String userId) async {
+    try {
+      final response = await _supabase
+          .from('investor_matches')
+          .select('investor_name, match_percentage, reason, created_at')
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print('Error fetching matches history: $e');
+      return [];
+    }
+  }
 }

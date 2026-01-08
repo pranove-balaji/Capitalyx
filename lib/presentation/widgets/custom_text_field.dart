@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:startup_application/presentation/widgets/translated_text.dart';
 
 class CustomTextField extends StatelessWidget {
   final TextEditingController controller;
@@ -26,7 +27,7 @@ class CustomTextField extends StatelessWidget {
       keyboardType: keyboardType,
       validator: validator,
       decoration: InputDecoration(
-        labelText: label,
+        label: TranslatedText(label),
         prefixIcon: prefixIcon != null ? Icon(prefixIcon) : null,
         filled: true,
       ),

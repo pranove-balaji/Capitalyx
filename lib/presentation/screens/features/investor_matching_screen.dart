@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:startup_application/core/theme/app_theme.dart';
@@ -8,6 +9,7 @@ import 'package:startup_application/presentation/widgets/language_selector.dart'
 import 'package:startup_application/presentation/widgets/translated_text.dart';
 import 'package:startup_application/presentation/providers/language_provider.dart';
 import 'package:startup_application/core/services/investor_matching_service.dart';
+import 'package:startup_application/core/services/glossary_service.dart';
 
 class InvestorMatchingScreen extends ConsumerStatefulWidget {
   const InvestorMatchingScreen({super.key});
@@ -196,6 +198,156 @@ class _InvestorMatchingScreenState extends ConsumerState<InvestorMatchingScreen>
     }
   }
 
+  void _showHistoryModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E1E),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) {
+          final userId = ref.read(authProvider).user?.id;
+          if (userId == null) {
+            return const Center(
+                child: Text('Please log in to view history',
+                    style: TextStyle(color: Colors.white)));
+          }
+
+          return FutureBuilder<List<Map<String, dynamic>>>(
+            future: _matchingService.fetchInvestorMatches(userId),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Center(
+                    child: Text('Error: ${snapshot.error}',
+                        style: const TextStyle(color: Colors.white)));
+              }
+              final history = snapshot.data ?? [];
+              if (history.isEmpty) {
+                return const Center(
+                    child: Text('No history found.',
+                        style: TextStyle(color: Colors.white)));
+              }
+
+              return Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Container(
+                      width: 40,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[600],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const Text(
+                    "Matching History",
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: ListView.builder(
+                      controller: scrollController,
+                      itemCount: history.length,
+                      itemBuilder: (context, index) {
+                        final item = history[index];
+                        final dateStr = item['created_at'];
+                        final date = dateStr != null
+                            ? DateTime.parse(dateStr).toLocal()
+                            : DateTime.now();
+                        final formattedDate =
+                            DateFormat.yMMMd().add_jm().format(date);
+                        final secondaryColor =
+                            AppTheme.getSecondaryColorForSector(
+                                ref.read(authProvider).profile?.startupSector ??
+                                    'Other');
+
+                        return Container(
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.1)),
+                          ),
+                          child: ListTile(
+                            title: Text(
+                              item['investor_name'] ?? 'Unknown',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  formattedDate,
+                                  style: TextStyle(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.5),
+                                      fontSize: 12),
+                                ),
+                                if (item['reason'] != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4.0),
+                                    child: Text(
+                                      item['reason'],
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.7),
+                                          fontSize: 13),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            trailing: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: secondaryColor.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                    color:
+                                        secondaryColor.withValues(alpha: 0.5)),
+                              ),
+                              child: Text(
+                                item['match_percentage'] ?? 'N/A',
+                                style: TextStyle(
+                                    color: secondaryColor,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
@@ -213,9 +365,16 @@ class _InvestorMatchingScreenState extends ConsumerState<InvestorMatchingScreen>
         ),
         title: const TranslatedText('Investor Matching',
             style: TextStyle(color: Colors.white)),
-        actions: const [
-          LanguageSelector(),
-          SizedBox(width: 8),
+        actions: [
+          TextButton.icon(
+            onPressed: _showHistoryModal,
+            icon: const Icon(Icons.history, color: Colors.white, size: 20),
+            label: const TranslatedText('History',
+                style: TextStyle(color: Colors.white)),
+          ),
+          const SizedBox(width: 8),
+          const LanguageSelector(),
+          const SizedBox(width: 8),
         ],
       ),
       body: SingleChildScrollView(
@@ -355,61 +514,82 @@ class _InvestorMatchingScreenState extends ConsumerState<InvestorMatchingScreen>
   }
 
   Widget _buildInvestorCard(Map<String, dynamic> match, Color color) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-          color: const Color(0xFF1E1E1E),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.3),
-                blurRadius: 10,
-                offset: const Offset(0, 4))
-          ]),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  match['investor_name'] ?? 'Unknown Investor',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold),
+    final languageCode = ref.watch(languageProvider).code;
+    final glossaryService = GlossaryService();
+
+    return FutureBuilder<Map<String, String>>(
+        future: Future.wait([
+          glossaryService.translate(
+              match['investor_name'] ?? 'Unknown Investor', languageCode),
+          glossaryService.translate(
+              match['reason'] ?? 'No reason provided.', languageCode),
+        ]).then((values) => {'name': values[0], 'reason': values[1]}),
+        builder: (context, snapshot) {
+          final name = snapshot.data?['name'] ??
+              match['investor_name'] ??
+              'Unknown Investor';
+          final reason = snapshot.data?['reason'] ??
+              match['reason'] ??
+              'No reason provided.';
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+                color: const Color(0xFF1E1E1E),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4))
+                ]),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        name,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: color.withValues(alpha: 0.5)),
+                      ),
+                      child: Text(
+                        match['match_percentage'] ?? 'N/A',
+                        style: TextStyle(
+                            color: color,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12),
+                      ),
+                    )
+                  ],
                 ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: color.withValues(alpha: 0.5)),
-                ),
-                child: Text(
-                  match['match_percentage'] ?? 'N/A',
+                const SizedBox(height: 12),
+                Text(
+                  reason,
                   style: TextStyle(
-                      color: color, fontWeight: FontWeight.bold, fontSize: 12),
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 14,
+                      height: 1.4),
                 ),
-              )
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            match['reason'] ?? 'No reason provided.',
-            style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.8),
-                fontSize: 14,
-                height: 1.4),
-          ),
-        ],
-      ),
-    );
+              ],
+            ),
+          );
+        });
   }
 
   Widget _buildTextField(

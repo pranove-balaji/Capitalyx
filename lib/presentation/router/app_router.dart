@@ -12,6 +12,7 @@ import 'package:startup_application/presentation/screens/resources/resource_scre
 import 'package:startup_application/presentation/screens/features/investor_matching_screen.dart';
 import 'package:startup_application/presentation/screens/features/funding_readiness_screen.dart';
 import 'package:startup_application/presentation/screens/features/pitch_deck_analyzer_screen.dart';
+import 'package:startup_application/presentation/screens/chat/chat_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
@@ -99,6 +100,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/pitch-deck-analyzer',
         builder: (context, state) => const PitchDeckAnalyzerScreen(),
+      ),
+      GoRoute(
+        path: '/chat',
+        builder: (context, state) => const ChatScreen(),
       ),
     ],
   );
