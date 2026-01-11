@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:startup_application/presentation/providers/auth_provider.dart';
+import 'package:startup_application/core/services/pitch_deck_service.dart';
 
 final featureControllerProvider = Provider((ref) => FeatureController(ref));
 
@@ -93,7 +94,7 @@ class FeatureController {
     });
   }
 
-  Future<void> uploadPitchDeck({
+  Future<String> uploadPitchDeck({
     required File file,
     required String fileExtension,
     required String targetStage,
@@ -104,11 +105,33 @@ class FeatureController {
       throw Exception('User not logged in');
     }
 
-    // 1️⃣ Build file path (stored in DB)
+    // 1️⃣ Validate Extension
+    if (fileExtension.toLowerCase() != 'pdf') {
+      throw Exception(
+          'Only PDF files are supported. Please convert your ${fileExtension.toUpperCase()} to PDF.');
+    }
+
+    // 2️⃣ Extract Text
+    final pitchDeckService = _ref.read(pitchDeckServiceProvider);
+    final text = await pitchDeckService.extractTextFromPdf(file);
+
+    if (text.isEmpty) {
+      throw Exception(
+          'Could not extract text from PDF. Is it a scanned image?');
+    }
+
+    // 2️⃣ Analyze Deck
+    final analysisResult = await pitchDeckService.analyzeDeck(
+      text,
+      targetStage,
+      investorType,
+    );
+
+    // 3️⃣ Build file path (stored in DB)
     final filePath =
         '${user.id}/${DateTime.now().millisecondsSinceEpoch}.$fileExtension';
 
-    // 2️⃣ Upload to PRIVATE bucket
+    // 4️⃣ Upload to PRIVATE bucket
     await _supabase.storage.from('pitchdecks').upload(
           filePath,
           file,
@@ -118,17 +141,70 @@ class FeatureController {
           ),
         );
 
-    // 3️⃣ Normalize values
+    // 5️⃣ Normalize values
     final normalizedStage = targetStage.toLowerCase().replaceAll(' ', '-');
     final normalizedInvestorType = investorType.toLowerCase();
 
-    // 4️⃣ Insert DB record (store ONLY path)
+    // 6️⃣ Parse Results for DB
+    String streghts = '';
+    String risks = '';
+    String suggestions = '';
+
+    // Simple parsing based on known headers
+    // Format:
+    // Pitch Deck Feedback: ...
+    // Key Risks: ...
+    // Suggestions: ...
+
+    final riskIndex = analysisResult.indexOf('Key Risks:');
+    final suggestIndex = analysisResult.indexOf('Suggestions:');
+
+    if (riskIndex != -1) {
+      streghts = analysisResult
+          .substring(0, riskIndex)
+          .replaceAll('Pitch Deck Feedback:', '')
+          .trim();
+
+      if (suggestIndex != -1 && suggestIndex > riskIndex) {
+        risks = analysisResult
+            .substring(riskIndex, suggestIndex)
+            .replaceAll('Key Risks:', '')
+            .trim();
+        suggestions = analysisResult
+            .substring(suggestIndex)
+            .replaceAll('Suggestions:', '')
+            .trim();
+      } else {
+        risks = analysisResult
+            .substring(riskIndex)
+            .replaceAll('Key Risks:', '')
+            .trim();
+      }
+    } else {
+      // Fallback
+      streghts = analysisResult;
+    }
+
     await _supabase.from('pitchdeck_analysis').insert({
       'user_id': user.id,
       'pitchdeck_url': filePath,
       'target_funding_stage': normalizedStage,
       'target_investor_type': normalizedInvestorType,
+      // Mapping to schema columns
+      'ai_summary':
+          '', // Script doesn't generate summary, keeping empty as requested
+      'ai_strengths': streghts, // Mapping "Pitch Deck Feedback" here
+      'ai_risks': risks,
+      'ai_suggestions': suggestions,
       'created_at': DateTime.now().toIso8601String(),
     });
+
+    return analysisResult;
   }
 }
+
+// Provider for DI
+final pitchDeckServiceProvider = Provider<PitchDeckService>((ref) {
+  // We can use GetIt or just create it here if it has no dependencies
+  return PitchDeckService();
+});

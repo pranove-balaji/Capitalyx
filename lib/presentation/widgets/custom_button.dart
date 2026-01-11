@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:startup_application/presentation/widgets/translated_text.dart';
 
 class CustomButton extends StatelessWidget {
   final VoidCallback onPressed;
@@ -35,7 +36,10 @@ class CustomButton extends StatelessWidget {
                 width: 20,
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
-            : Text(text),
+            : TranslatedText(
+                text,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
       ),
     );
   }

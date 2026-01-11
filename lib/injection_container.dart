@@ -9,6 +9,7 @@ import 'package:startup_application/domain/repositories/profile_repository.dart'
 import 'package:startup_application/domain/repositories/query_repository.dart';
 import 'package:startup_application/data/repositories/query_repository_impl.dart';
 import 'package:startup_application/core/services/glossary_service.dart';
+import 'package:startup_application/core/services/pitch_deck_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 final sl = GetIt.instance;
@@ -22,6 +23,7 @@ Future<void> init() async {
 
   // ! Services
   sl.registerLazySingleton(() => GlossaryService());
+  sl.registerLazySingleton(() => PitchDeckService());
 
   // ! Data Sources
   sl.registerLazySingleton<AuthRemoteDataSource>(

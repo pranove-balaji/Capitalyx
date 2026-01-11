@@ -44,9 +44,11 @@ class GlossaryService {
       return {for (var t in texts) t: t};
     }
 
-    final apiKey = dotenv.env['GOOGLE_TRANSLATE_API_KEY'];
+    String? apiKey = dotenv.env['GOOGLE_CLOUD_API_KEY'];
+    apiKey ??= dotenv.env['google_cloud_api_key'];
+
     if (apiKey == null || apiKey.isEmpty) {
-      print('Warning: GOOGLE_TRANSLATE_API_KEY not found.');
+      print('Warning: GOOGLE_CLOUD_API_KEY not found in .env');
       return {for (var t in texts) t: "$t [MISSING KEY]"};
     }
 
@@ -119,5 +121,56 @@ class GlossaryService {
         .replaceAll('&#39;', "'");
 
     return result;
+  }
+
+  Future<String> translateJson(String jsonString, String targetLang) async {
+    try {
+      if (targetLang == 'en') return jsonString;
+
+      final jsonMap = json.decode(jsonString);
+      if (jsonMap is! Map<String, dynamic>)
+        return await translate(jsonString, targetLang);
+
+      final newJson = Map<String, dynamic>.from(jsonMap);
+
+      // Translate Title
+      if (newJson['title'] != null) {
+        newJson['title'] = await translate(newJson['title'], targetLang);
+      }
+      // Translate Summary
+      if (newJson['summary'] != null) {
+        newJson['summary'] = await translate(newJson['summary'], targetLang);
+      }
+      // Translate Sections
+      if (newJson['sections'] != null && newJson['sections'] is List) {
+        final sections = newJson['sections'] as List;
+        final newSections = [];
+        for (var s in sections) {
+          if (s is Map) {
+            final secMap = Map<String, dynamic>.from(s);
+            if (secMap['heading'] != null) {
+              secMap['heading'] =
+                  await translate(secMap['heading'], targetLang);
+            }
+            if (secMap['points'] != null && secMap['points'] is List) {
+              final pts = secMap['points'] as List;
+              final newPts = [];
+              for (var p in pts) {
+                newPts.add(await translate(p.toString(), targetLang));
+              }
+              secMap['points'] = newPts;
+            }
+            newSections.add(secMap);
+          } else {
+            newSections.add(s);
+          }
+        }
+        newJson['sections'] = newSections;
+      }
+      return jsonEncode(newJson);
+    } catch (e) {
+      // Fallback
+      return await translate(jsonString, targetLang);
+    }
   }
 }

@@ -11,14 +11,29 @@ class VoiceService {
   final AudioRecorder _audioRecorder = AudioRecorder();
   final AudioPlayer _audioPlayer = AudioPlayer();
 
-  // Provided API Key
-  static const String _fallbackKey = 'AIzaSyDtdbiWN2NJaclZtYZ8pGpgHTaF7CRyuqo';
+  String get _apiKey =>
+      dotenv.env['GOOGLE_CLOUD_API_KEY'] ??
+      dotenv.env['google_cloud_api_key'] ??
+      "";
 
-  String get _apiKey => dotenv.env['GOOGLE_CLOUD_API_KEY'] ?? _fallbackKey;
+  bool _isRequestingPermission = false;
 
   Future<bool> hasPermission() async {
-    final status = await Permission.microphone.request();
-    return status == PermissionStatus.granted;
+    if (_isRequestingPermission) return false;
+
+    var status = await Permission.microphone.status;
+    if (status.isGranted) return true;
+
+    try {
+      _isRequestingPermission = true;
+      status = await Permission.microphone.request();
+      return status == PermissionStatus.granted;
+    } catch (e) {
+      print("Permission request error: $e");
+      return false;
+    } finally {
+      _isRequestingPermission = false;
+    }
   }
 
   Future<void> startRecording() async {
@@ -29,14 +44,17 @@ class VoiceService {
       const config = RecordConfig(
         encoder: AudioEncoder.wav,
         sampleRate: 16000,
+        numChannels: 1, // Google STT prefers Mono
       );
 
+      print("VoiceService: Starting recording to $path");
       await _audioRecorder.start(config, path: path);
     }
   }
 
   Future<String?> stopRecording() async {
     final path = await _audioRecorder.stop();
+    print("VoiceService: Recording stopped, path: $path");
     return path;
   }
 
@@ -52,6 +70,19 @@ class VoiceService {
   /// STT: Transcribe audio file using Google Cloud Speech-to-Text
   Future<String?> transcribe(String filePath, String languageCode) async {
     final file = File(filePath);
+    if (!await file.exists()) {
+      print("VoiceService Error: Audio file does not exist at $filePath");
+      return null;
+    }
+    final fileSize = await file.length();
+    print("VoiceService: Audio file size: $fileSize bytes");
+
+    if (fileSize < 100) {
+      print(
+          "VoiceService Warning: Audio file is too small (likely silence or header only).");
+      return null;
+    }
+
     final audioBytes = await file.readAsBytes();
     final audioBase64 = base64Encode(audioBytes);
 
@@ -67,8 +98,8 @@ class VoiceService {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'config': {
-          'encoding': 'LINEAR16',
-          'sampleRateHertz': 16000,
+          // 'encoding': 'LINEAR16', // Removed: Let Google auto-detect WAV header
+          // 'sampleRateHertz': 16000, // Removed: Let Google auto-detect from WAV header
           'languageCode': sttLang,
           'enableAutomaticPunctuation': true,
         },
@@ -76,19 +107,17 @@ class VoiceService {
       }),
     );
 
-    // IMPORTANT FIX: 'record' defaults to AAC. Google STT prefers LINEAR16 (WAV).
-    // The startRecording method above setup AAC. We should stick to WAV for easiest STT integration.
-    // I will update startRecording to use WAV in the file content update if I can't here.
-    // Actually, let's fix the startRecording logic in the file I am writing now. -> Updated below.
-
     if (response.statusCode == 200) {
       final jsonResponse = jsonDecode(response.body);
+      print("STT Response: $jsonResponse"); // Debug log
+
       if (jsonResponse['results'] != null &&
           (jsonResponse['results'] as List).isNotEmpty) {
         return jsonResponse['results'][0]['alternatives'][0]['transcript'];
       }
+      print("STT Warning: Valid 200 response but no results found.");
     } else {
-      print('STT Error: ${response.body}');
+      print('STT Error: ${response.statusCode} - ${response.body}');
     }
     return null;
   }
@@ -146,6 +175,4 @@ class VoiceService {
         return 'en-US';
     }
   }
-
-  // Correction: The actual implementation should use startRecordingWav logic inside startRecording
 }

@@ -95,7 +95,21 @@ class LanguageNotifier extends StateNotifier<LanguageState> {
     if (savedMapString != null) {
       try {
         final loadedMap = Map<String, String>.from(jsonDecode(savedMapString));
-        state = LanguageState(code: languageCode, translations: loadedMap);
+        // Check for invalid cached inputs (from previous missing key errors)
+        final bool hasErrors = loadedMap.values.any((v) =>
+            v.contains('[MISSING KEY]') ||
+            v.contains('[Err]') ||
+            v.contains('[Exc]'));
+
+        if (hasErrors) {
+          debugPrint(
+              'Found corrupted cache for $languageCode, refreshing translations...');
+          await prefs.remove('translations_$languageCode');
+          state = LanguageState(code: languageCode, isLoading: true);
+          await _translateAll(languageCode);
+        } else {
+          state = LanguageState(code: languageCode, translations: loadedMap);
+        }
       } catch (e) {
         state = LanguageState(code: languageCode, isLoading: true);
         await _translateAll(languageCode);
